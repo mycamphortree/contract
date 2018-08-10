@@ -11,6 +11,6 @@ cleos get table xiaomiantuan MT stat
   "more": false
 }
 
-现行兑换比例：1MT：1MT
+现行兑换比例：1EOS：1MT
 
 分红：按持股比例分红
