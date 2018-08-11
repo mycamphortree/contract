@@ -8,6 +8,9 @@
 
 using namespace eosio;
 
+#define MT_SYMBOL S(4,MT)
+#define CORE_SYMBOL_TO_MT_SYMBOL 1
+
 namespace xiaomiantuan {
 
 void token::create( account_name issuer,
@@ -16,7 +19,7 @@ void token::create( account_name issuer,
     require_auth( _self );
 
     auto sym = maximum_supply.symbol;
-    eosio_assert( sym.is_valid(), "invalid symbol name" );
+    eosio_assert( sym == MT_SYMBOL, "invalid symbol name" );
     eosio_assert( maximum_supply.is_valid(), "invalid supply");
     eosio_assert( maximum_supply.amount > 0, "max-supply must be positive");
 
@@ -87,9 +90,9 @@ void token::transfer( account_name from,
 }
 
 void token::sub_balance( account_name owner, asset value ) {
-   accounts from_acnts( _self, owner );
+   accounts from_acnts( _self, _self);
 
-   const auto& from = from_acnts.get( value.symbol.name(), "no balance object found" );
+   const auto& from = from_acnts.get( owner, "no balance object found" );
    eosio_assert( from.balance.amount >= value.amount, "overdrawn balance" );
 
 
@@ -97,6 +100,7 @@ void token::sub_balance( account_name owner, asset value ) {
       from_acnts.erase( from );
    } else {
       from_acnts.modify( from, owner, [&]( auto& a ) {
+          a.owner = owner;
           a.balance -= value;
       });
    }
@@ -104,17 +108,41 @@ void token::sub_balance( account_name owner, asset value ) {
 
 void token::add_balance( account_name owner, asset value, account_name ram_payer )
 {
-   accounts to_acnts( _self, owner );
-   auto to = to_acnts.find( value.symbol.name() );
+   accounts to_acnts( _self, _self );
+   auto to = to_acnts.find( owner );
    if( to == to_acnts.end() ) {
       to_acnts.emplace( ram_payer, [&]( auto& a ){
+        a.owner = owner;
         a.balance = value;
       });
    } else {
       to_acnts.modify( to, 0, [&]( auto& a ) {
+        a.owner = owner;
         a.balance += value;
       });
    }
+}
+
+void token::bonus(int64_t in){
+    symbol_type mts = MT_SYMBOL;
+    stats statstable( _self, mts.name());
+    accounts acnts( _self, _self );
+    auto existing = statstable.find( mts.name() );
+    eosio_assert( existing != statstable.end(), "token with symbol does not exist, create token before issue" );
+    int64_t sum = existing->supply.amount;
+    eosio_assert(sum > 0 , "must have supply")
+    auto idx = acnts.get_index<N(accountsbal)>();
+    double temp = 0;
+    int64_t send = 0;
+    for ( auto it = idx.cbegin(); it != idx.cend(); ++it ) {
+        temp = it->balance.amount * in * 1.0 / sum;
+        send = int64_t(temp);
+        if(send > 0){
+            INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {_self,N(active)},
+                                                          { _self, it->owner, asset(send,CORE_SYMBOL), std::string("报告股东，分红到了") } );
+        }
+
+    }
 }
 
 void token::quick_transfer( account_name from,
@@ -129,15 +157,21 @@ void token::quick_transfer( account_name from,
     eosio_assert(  to == _self, "must to xiaomiantuan contract");
     eosio_assert(  quantity.symbol == CORE_SYMBOL, "must use system coin");
 
-
-
     eosio_assert( quantity.is_valid(), "invalid quantity" );
     eosio_assert( quantity.amount > 0, "must transfer positive quantity" );
     // eosio_assert( quantity.symbol == st.supply.symbol, "symbol precision mismatch" );
     eosio_assert( memo.size() <= 256, "memo has more than 256 bytes" );
 
+    if(memo == string("bonus")){
+        bonus(quantity.amount);
+        print("bonus");
+        return;
+    }
 
-    asset mt_quantity(quantity.amount,S(4,MT));
+
+
+    asset mt_quantity(quantity.amount,MT_SYMBOL);
+    mt_quantity.amount *= CORE_SYMBOL_TO_MT_SYMBOL;
 
     auto sym = mt_quantity.symbol;
     eosio_assert( sym.is_valid(), "invalid symbol name" );
@@ -184,8 +218,9 @@ extern "C" { \
       if(action == N(transfer) && code == N(eosio.token)) { \
          TYPE thiscontract( self ); \
          eosio::execute_action( &thiscontract, &xiaomiantuan::token::quick_transfer); \
+         return; \
       } \
-      if((action==N(transfer) && code == N(xiaomiantuan)) || code == self || action == N(onerror) ) { \
+      if(code == self || action == N(onerror) ) { \
          TYPE thiscontract( self ); \
          switch( action ) { \
             EOSIO_API( TYPE, MEMBERS ) \

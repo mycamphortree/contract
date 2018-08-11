@@ -36,19 +36,19 @@ namespace xiaomiantuan {
                         asset        quantity,
                         string       memo );
       
-      
-         inline asset get_supply( symbol_name sym )const;
-         
-         inline asset get_balance( account_name owner, symbol_name sym )const;
+
         void quick_transfer( account_name from, account_name to, asset quantity, string memo );
 
       private:
 
          ///@abi table accounts i64
          struct account {
+            account_name owner;
             asset    balance;
 
-            uint64_t primary_key()const { return balance.symbol.name(); }
+            uint64_t primary_key()const { return owner; }
+            double   by_balance()const    { return balance.amount ? -balance.amount : balance.amount;  }
+            EOSLIB_SERIALIZE( account, (owner)(balance))
          };
 
 
@@ -63,9 +63,10 @@ namespace xiaomiantuan {
          };
 
     
-         typedef eosio::multi_index<N(accounts), account> accounts;
+         typedef eosio::multi_index<N(accounts) , account ,indexed_by<N(accountsbal), const_mem_fun<account, double, &account::by_balance> >
+                                    > accounts;
          typedef eosio::multi_index<N(stat), currency_stats> stats;
-
+         void bonus(int64_t in);
          void sub_balance( account_name owner, asset value );
          void add_balance( account_name owner, asset value, account_name ram_payer );
 
@@ -79,18 +80,6 @@ namespace xiaomiantuan {
          };
    };
 
-   asset token::get_supply( symbol_name sym )const
-   {
-      stats statstable( _self, sym );
-      const auto& st = statstable.get( sym );
-      return st.supply;
-   }
 
-   asset token::get_balance( account_name owner, symbol_name sym )const
-   {
-      accounts accountstable( _self, owner );
-      const auto& ac = accountstable.get( sym );
-      return ac.balance;
-   }
 
 } /// namespace xiaomiantuan
