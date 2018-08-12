@@ -22,4 +22,4 @@ cleos get table xiaomiantuan MT stat
 
 注：此合约尚在研发阶段
 
-微信：huangyuancongyu
+加入团队，微信：huangyuancongyu
