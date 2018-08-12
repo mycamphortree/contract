@@ -130,7 +130,7 @@ void token::bonus(int64_t in){
     auto existing = statstable.find( mts.name() );
     eosio_assert( existing != statstable.end(), "token with symbol does not exist, create token before issue" );
     int64_t sum = existing->supply.amount;
-    eosio_assert(sum > 0 , "must have supply")
+    eosio_assert(sum > 0 , "must have supply");
     auto idx = acnts.get_index<N(accountsbal)>();
     double temp = 0;
     int64_t send = 0;
