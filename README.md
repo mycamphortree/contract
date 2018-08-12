@@ -14,3 +14,4 @@ cleos get table xiaomiantuan MT stat
 现行兑换比例：1EOS：1MT
 
 分红：按持股比例分红
+注：此合约尚在研发阶段
